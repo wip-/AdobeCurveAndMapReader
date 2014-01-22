@@ -1,18 +1,12 @@
 ﻿using System;
 using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
-using System.Windows;
-using System.Windows.Controls;
-using System.Windows.Data;
-using System.Windows.Documents;
-using System.Windows.Input;
-using System.Windows.Media;
-using System.Windows.Media.Imaging;
-using System.Windows.Navigation;
 //using System.Windows.Shapes;
 using System.IO;
+using System.Linq;
+using System.Text;
+using System.Windows;
+using System.Windows.Input;
+using Microsoft.Win32;
 
 namespace AdobeCurveAndMapReader
 {
@@ -21,6 +15,9 @@ namespace AdobeCurveAndMapReader
     /// </summary>
     public partial class MainWindow : Window
     {
+        private String SourceFileName;
+
+
         public MainWindow()
         {
             InitializeComponent();
@@ -44,20 +41,20 @@ namespace AdobeCurveAndMapReader
             if (files.Length > 1)
                 return "Too many files!";
 
-            String fileName = files[0];
+            SourceFileName = files[0];
 
-            if (!File.Exists(fileName))
+            if (!File.Exists(SourceFileName))
                 return "Not a file!";
 
             String parsingResult = String.Empty;
-            if (String.Equals(Path.GetExtension(fileName), ".ACV", StringComparison.OrdinalIgnoreCase))
+            if (String.Equals(Path.GetExtension(SourceFileName), ".ACV", StringComparison.OrdinalIgnoreCase))
             {
-                AdobeCurves acv = new AdobeCurves(fileName);
+                AdobeCurves acv = new AdobeCurves(SourceFileName);
                 parsingResult = acv.ToString();
             }
-            else if (String.Equals(Path.GetExtension(fileName), ".AMP", StringComparison.OrdinalIgnoreCase))
+            else if (String.Equals(Path.GetExtension(SourceFileName), ".AMP", StringComparison.OrdinalIgnoreCase))
             {
-                AdobeArbitraryMap amp = new AdobeArbitraryMap(fileName);
+                AdobeArbitraryMap amp = new AdobeArbitraryMap(SourceFileName);
                 parsingResult = amp.ToString();
             }
             else
@@ -65,7 +62,7 @@ namespace AdobeCurveAndMapReader
                 parsingResult = "Unrecognized file extension";
             }
 
-            parsingResult = Path.GetFileName(fileName) + Environment.NewLine + parsingResult;
+            parsingResult = Path.GetFileName(SourceFileName) + Environment.NewLine + parsingResult;
 
             return parsingResult;
         }
@@ -93,6 +90,8 @@ namespace AdobeCurveAndMapReader
                     public UInt16 X;
                 }
             }
+
+            public AdobeCurves() { }
 
             public AdobeCurves(String fileName)
             {
@@ -152,6 +151,17 @@ namespace AdobeCurveAndMapReader
                 }
                 return res;
             }
+
+            public bool FromString(String text)
+            {
+                // TODO
+                return false;
+            }
+
+            public void ToBinary(String filename)
+            {
+                // TODO
+            }
         }
 
 
@@ -166,6 +176,8 @@ namespace AdobeCurveAndMapReader
             {
                 public List<byte> Values;
             }
+
+            public AdobeArbitraryMap(){}
 
             public AdobeArbitraryMap(String fileName)
             {
@@ -193,7 +205,7 @@ namespace AdobeCurveAndMapReader
 
                 for (int c = 0; c < CurvesCount; ++c)
                 {
-                    res += Environment.NewLine + "Curve " + c + ":   ";
+                    res += Environment.NewLine + String.Format("Curve {0:D2}:  ", c);
                     Curve curve = Curves.ElementAt(c);
                     for (int p = 0; p < 256; ++p)
                     {
@@ -203,6 +215,53 @@ namespace AdobeCurveAndMapReader
                 }
                 return res;
             }
+
+            /// <summary>
+            /// Try to initialize from string. Returns success or failure flag.
+            /// </summary>
+            public bool FromString(String text)
+            {
+                try
+                {
+                    string[] lines = text.Split(new String[] { Environment.NewLine }, StringSplitOptions.None);
+
+                    if (lines.Length <= 3)
+                        return false;
+
+                    CurvesCount = lines.Length - 3;
+                    Curves = new List<Curve>();
+                    for (int c = 0; c < CurvesCount; ++c)
+                    {
+                        String valuesString = lines[c + 3];
+                        int trailingCharsLength = "Curve xx:  ".Length;
+                        valuesString = valuesString.Substring(trailingCharsLength, valuesString.Length - trailingCharsLength);
+                        String[] valuesStrings = valuesString.Split(new String[]{" "}, StringSplitOptions.RemoveEmptyEntries);
+                        byte[] values = Array.ConvertAll<string, byte>(valuesStrings, byte.Parse);
+                        Curve curve = new Curve();
+                        curve.Values = values.ToList();
+                        Curves.Add(curve);
+                    }
+                    return true;
+
+                }
+                catch (System.Exception /*ex*/)
+                {
+                    return false;
+                }
+            }
+
+            public void ToBinary(String filename)
+            {
+                List<byte> bytes = new List<byte>();
+                foreach(Curve curve in Curves)
+                {
+                    foreach(byte value in curve.Values)
+                    {
+                        bytes.Add(value);
+                    }
+                }
+                File.WriteAllBytes(filename, bytes.ToArray());
+            }
         }
 
 
@@ -211,6 +270,42 @@ namespace AdobeCurveAndMapReader
             e.Effects = DragDropEffects.All;
             e.Handled = true;
         }
+
+        private void OnKeyDown(object sender, KeyEventArgs e)
+        {
+            if(e.Key == Key.S && Keyboard.IsKeyDown(Key.LeftCtrl))
+            {
+                AdobeArbitraryMap ampTry = new AdobeArbitraryMap();
+                AdobeCurves acvTry = new AdobeCurves();
+
+                if (ampTry.FromString(TextBox.Text))
+                {
+                    SaveFileDialog dialog = new SaveFileDialog();
+                    dialog.Filter = "Map Files(*.AMP)|*.AMP";
+                    if (SourceFileName != null)
+                        dialog.InitialDirectory = Path.GetDirectoryName(SourceFileName);
+                    if (dialog.ShowDialog() == true)
+                        ampTry.ToBinary(dialog.FileName);
+                }
+                else if (acvTry.FromString(TextBox.Text))
+                {
+                    SaveFileDialog dialog = new SaveFileDialog();
+                    dialog.Filter = "Curve Files(*.ACV)|*.ACV";
+                    if (SourceFileName != null)
+                        dialog.InitialDirectory = Path.GetDirectoryName(SourceFileName);
+                    if (dialog.ShowDialog() == true)
+                        acvTry.ToBinary(dialog.FileName);
+                }
+                else
+                {
+                    MessageBox.Show("Not a supported format");
+                }
+
+                e.Handled = true;
+            }
+        }
+
+
     }
 
     public static class Helpers

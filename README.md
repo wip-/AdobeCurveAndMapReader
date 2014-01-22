@@ -1,4 +1,4 @@
 AdobeCurveAndMapReader
 ======================
 
-Display the contents of Adobe Curves (.ACV) and Arbitrary Map (.AMP) files
+Edit the contents of Adobe Curves (.ACV) and Arbitrary Map (.AMP) files

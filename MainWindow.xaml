@@ -4,7 +4,8 @@
         Title="MainWindow" Height="200" Width="1200">
     <TextBox Name="TextBox" FontFamily="Courier New"
              ScrollViewer.HorizontalScrollBarVisibility="Auto" ScrollViewer.VerticalScrollBarVisibility="Auto"
-             PreviewDragEnter="OnDragOver" PreviewDragOver="OnDragOver" PreviewDrop="FileDrop" >
+             PreviewDragEnter="OnDragOver" PreviewDragOver="OnDragOver" PreviewDrop="FileDrop"
+             KeyDown="OnKeyDown">
         Drop .ACV or .AMP file here
     </TextBox>
 </Window>
